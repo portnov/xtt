@@ -27,5 +27,5 @@ query qry2 =
 ;
 
 query qry3 =
-  group by $workspace, $title
+  group by $workspace, $class
 ;

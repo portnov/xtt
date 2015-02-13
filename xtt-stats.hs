@@ -10,6 +10,7 @@ import Data.Binary
 import Data.Binary.Get
 import System.Environment (getArgs)
 import System.IO
+import Options.Applicative
 import Text.Regex.Posix
 
 import XMonad.TimeTracker.Types
@@ -42,18 +43,46 @@ formatTaskInfo ti =
     showValues (key, vmap) =
         ["\t" ++ key ++ ":\t" ++ toString value ++ "\t" ++ formatDt dt  | (value, dt) <- M.assocs vmap]
 
+data Options =
+  Options {
+    oLogFilename :: FilePath,
+    oDefsFilename :: FilePath,
+    oQueryName :: String
+  }
+  deriving (Eq, Show)
+
+cmdline :: FilePath -> FilePath -> Parser Options
+cmdline defLog defDefs =
+  Options
+    <$> strOption
+        (long "data" <> metavar "TRACKER.DAT"
+         <> short 'd'
+         <> value defLog
+         <> help "Tracker data log file")
+    <*> strOption
+        (long "source" <> metavar "SOURCE.XTT"
+        <> short 's'
+        <> value defDefs
+        <> help "Query definitions source file")
+    <*> argument str (metavar "QUERY" <> value "default")
+
 main :: IO ()
 main = do
-  args <- getArgs
-  filename <- case args of  
-                [] -> defaultTrackerLog
-                [name] -> return name
-                _ -> fail $ "Synopsis: xtt-stats [filename.dat]"
-  dat <- BL.readFile filename
+    defLog <- defaultTrackerLog
+    defDefs <- defaultDefSource
+    let opts = info (helper <*> cmdline defLog defDefs)
+                    (fullDesc
+                     <> progDesc "Output results of QUERY defined in SOURCE.XTT by tracker data log TRACKER.DAT"
+                     <> header "xtt-stats - statistics tool of XMonad Time Tracker")
+    execParser opts >>= realMain
+
+realMain :: Options -> IO ()
+realMain opts = do
+  dat <- BL.readFile (oLogFilename opts)
   let events = runGet readEvents dat
-  defs <- parseFile "sample.xtt"
-  case getQuery "qry2" defs of
-    Nothing -> putStrLn "No default query"
+  defs <- parseFile (oDefsFilename opts)
+  case getQuery (oQueryName opts) defs of
+    Nothing -> putStrLn "No specified query defined"
     Just qry -> do
           let tasks = runProcess (dVariables defs) qry events
           forM_ (M.assocs tasks) $ \(key, ti) -> do

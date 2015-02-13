@@ -43,10 +43,16 @@ data Tracker = Tracker {
 instance ExtensionClass Tracker where
   initialValue = NoTracker
 
-defaultTrackerLog :: IO FilePath
-defaultTrackerLog = do
+defaultFile :: FilePath -> IO FilePath
+defaultFile name = do
   home <- getEnv "HOME"
-  return $ home </> ".xmonad" </> "tracker.dat"
+  return $ home </> ".xmonad" </> name
+
+defaultTrackerLog :: IO FilePath
+defaultTrackerLog = defaultFile "tracker.dat"
+
+defaultDefSource :: IO FilePath
+defaultDefSource = defaultFile "query.xtt"
 
 trackerInit :: FilePath -> X ()
 trackerInit path = do

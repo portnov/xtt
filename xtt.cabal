@@ -76,5 +76,6 @@ executable xtt-stats
                        xmonad >=0.12,
                        xmonad-contrib >=0.12,
                        mtl >= 2.2.1,
-                       parsec >= 3
+                       parsec >= 3,
+                       optparse-applicative
 
