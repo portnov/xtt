@@ -84,7 +84,8 @@ realMain opts = do
   case getQuery (oQueryName opts) defs of
     Nothing -> putStrLn "No specified query defined"
     Just qry -> do
-          let tasks = runProcess (dVariables defs) qry events
+          let (tasks, total) = runProcess (dVariables defs) qry events
           forM_ (M.assocs tasks) $ \(key, ti) -> do
-              putStrLn $ toString key ++ "\t" ++ formatTaskInfo ti
+                   putStrLn $ toString key ++ "\t" ++ formatTaskInfo ti
+          putStrLn $ "Total: " ++ formatDt total
 

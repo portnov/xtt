@@ -44,6 +44,7 @@ data ParserState = PS {
       psCurrentTask :: String
     , psStartTime :: Maybe UTCTime
     , psPrevEvent :: Maybe TEvent
+    , psTotalTime :: NominalDiffTime
     , psResult :: M.Map Value TaskInfo
     } deriving (Eq, Show)
 
@@ -52,6 +53,7 @@ emptyPS = PS {
   psCurrentTask = "Startup",
   psStartTime = Nothing,
   psPrevEvent = Nothing,
+  psTotalTime = 0,
   psResult = M.empty }
 
 addTime :: NominalDiffTime -> TaskInfo -> TaskInfo
@@ -91,8 +93,9 @@ process vars selector key fields ev = do
     Nothing -> return ()
     Just prevEvent -> do
       let dt = diffUTCTime (eTimestamp ev) (eTimestamp prevEvent)
-      when (good prevEvent) $
+      when (good prevEvent) $ do
           putData (getKey prevEvent) dt (evalFields prevEvent)
+          St.modify $ \st -> st {psTotalTime = psTotalTime st + dt}
   when (eTask ev /= psCurrentTask st) $ do
       St.put $ st {psCurrentTask = eTask ev, psStartTime = Just (eTimestamp ev)}
   St.modify $ \st -> st {psPrevEvent = Just ev}
@@ -100,8 +103,8 @@ process vars selector key fields ev = do
 processAll :: [VarDefinition] -> Expr -> Expr -> [(String,Expr)] -> [TEvent] -> St.State ParserState ()
 processAll vars selector key fields events = mapM_ (process vars selector key fields) events
 
-runProcess :: [VarDefinition] -> Query -> [TEvent] -> M.Map Value TaskInfo
+runProcess :: [VarDefinition] -> Query -> [TEvent] -> (M.Map Value TaskInfo, NominalDiffTime)
 runProcess vars q events = 
   let st = St.execState (processAll vars (qWhere q) (qGroupBy q) (qSelect q) events) emptyPS
-  in  psResult st
+  in  (psResult st, psTotalTime st)
 
