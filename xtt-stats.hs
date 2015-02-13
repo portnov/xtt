@@ -3,6 +3,7 @@ module Main where
 import Control.Monad
 import qualified Control.Monad.State as St
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.ByteString.Lazy as BL
 import Data.Time
 import Data.Binary
@@ -59,12 +60,23 @@ qry = Query {
   qGroupBy = StringProperty "task"
 }
 
+qry2 :: Query
+qry2 = qry {qSelect = [("TITLE", StringProperty "title"), ("CLASS", StringProperty "class")]}
+
+qry3 :: Query
+qry3 = Query {
+  qSelect = [("TITLE", StringProperty "title")],
+  qWhere = Lit (Bool True),
+  qGroupBy = StringProperty "workspace"
+}
+
 formatTaskInfo :: TaskInfo -> String
 formatTaskInfo ti =
     formatDt (tiDuration ti) ++ "\n" ++
     unlines (concatMap showValues $ M.assocs $ tiFields ti)
   where
-    showValues (key, values) = ["\t" ++ key ++ ":\t" ++ toString value | value <- values]
+    showValues (key, vmap) =
+        ["\t" ++ key ++ ":\t" ++ toString value ++ "\t" ++ formatDt dt  | (value, dt) <- M.assocs vmap]
 
 main :: IO ()
 main = do
@@ -75,7 +87,7 @@ main = do
                 _ -> fail $ "Synopsis: xtt-stats [filename.dat]"
   dat <- BL.readFile filename
   let events = runGet readEvents dat
-  let tasks = runProcess qry events
+  let tasks = runProcess qry2 events
   forM_ (M.assocs tasks) $ \(key, ti) -> do
       putStrLn $ toString key ++ "\t" ++ formatTaskInfo ti
 
