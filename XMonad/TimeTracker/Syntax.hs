@@ -14,6 +14,7 @@ data Expr =
   | Match Expr Expr
   | Or Expr Expr
   | And Expr Expr
+  | Case [(Expr, Expr)] Expr
   deriving (Eq,Show)
 
 pPrint :: Expr -> String
@@ -25,6 +26,9 @@ pPrint (Equals e1 e2) = pPrint e1 ++ "==" ++ pPrint e2
 pPrint (Match e1 e2) = pPrint e1 ++ "=~" ++ pPrint e2
 pPrint (Or e1 e2) = pPrint e1 ++ "||" ++ pPrint e2
 pPrint (And e1 e2) = pPrint e1 ++ "&&" ++ pPrint e2
+pPrint (Case pairs def) = "case " ++ unlines (map go pairs) ++ " else " ++ pPrint def
+  where
+    go (cond, val) = " when " ++ pPrint cond ++ " then " ++ pPrint val
 
 data Value =
     String String
@@ -41,6 +45,7 @@ isElem expr regexs = Equals expr $ List $ map (Lit . String) regexs
 toBool :: Value -> Bool
 toBool (Bool b) = b
 toBool (String s) = s /= "" 
+toBool (LitList lst) = not (null lst)
 
 toString :: Value -> String
 toString (String s) = s

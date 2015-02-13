@@ -28,7 +28,10 @@ eval vars expr ev = go expr
       case lookup i vars of
         Just val -> go val
         Nothing  -> error $ "Unknown identifier: " ++ i
-    go x = error $ show x
+    go (Case pairs def) =
+      case [expr | (cond, expr) <- pairs, toBool (go cond)] of
+        [] -> go def
+        (e:_) -> go e
 
 data TaskInfo =
   TaskInfo {

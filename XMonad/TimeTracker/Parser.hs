@@ -15,7 +15,7 @@ import XMonad.TimeTracker.Syntax
 
 xttDef = haskellDef {
            P.reservedOpNames = ["==", "=~", "&&", "||"],
-           P.reservedNames = ["let", "query", "select", "where", "group", "by", "as"]
+           P.reservedNames = ["let", "query", "select", "where", "group", "by", "as", "case", "when", "then"]
         }
 
 xttTokenParser :: P.TokenParser ()
@@ -61,7 +61,24 @@ pIdentifier :: Parser Expr
 pIdentifier = Identifier <$> identifier
 
 pExpr :: Parser Expr
-pExpr = buildExpressionParser table term <?> "expression"
+pExpr =
+  try pCase <|>
+    buildExpressionParser table term <?> "expression"
+
+pCase :: Parser Expr
+pCase = do
+    reserved "case"
+    pairs <- many1 pWhen
+    reserved "else"
+    def <- pExpr
+    return $ Case pairs def
+  where
+    pWhen = do
+      reserved "when"
+      cond <- pExpr
+      reserved "then"
+      expr <- pExpr
+      return (cond, expr)
 
 term = parens pExpr
    <|> pList

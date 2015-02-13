@@ -16,6 +16,12 @@ let isWork =
     $class == workClasses
 ;
 
+let smth = case
+             when $class == "Gnome-terminal" then "terminal"
+             when $title =~ "GVIM" then "gvim"
+             else "other"
+;
+
 query default =
   where isWork
   group by $task
@@ -28,4 +34,8 @@ query qry2 =
 
 query qry3 =
   group by $workspace, $class
+;
+
+query qry4 =
+  group by smth
 ;
