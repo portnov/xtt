@@ -11,6 +11,7 @@ import Data.Binary.Get
 import System.Environment (getArgs)
 import System.IO
 import Options.Applicative
+import qualified Text.Parsec as Parsec
 import Text.Regex.Posix
 
 import XMonad.TimeTracker.Types
@@ -47,6 +48,7 @@ data Options =
   Options {
     oLogFilename :: FilePath,
     oDefsFilename :: FilePath,
+    oQuery :: Maybe String,
     oQueryName :: String
   }
   deriving (Eq, Show)
@@ -64,6 +66,10 @@ cmdline defLog defDefs =
         <> short 's'
         <> value defDefs
         <> help "Query definitions source file")
+    <*> optional (strOption
+          (long "query" <> metavar "QUERY"
+           <> short 'q'
+           <> help "Execute specified query instead of default"))
     <*> argument str (metavar "QUERY" <> value "default")
 
 main :: IO ()
@@ -81,11 +87,17 @@ realMain opts = do
   dat <- BL.readFile (oLogFilename opts)
   let events = runGet readEvents dat
   defs <- parseFile (oDefsFilename opts)
-  case getQuery (oQueryName opts) defs of
-    Nothing -> putStrLn "No specified query defined"
-    Just qry -> do
-          let (tasks, total) = runProcess (dVariables defs) qry events
-          forM_ (M.assocs tasks) $ \(key, ti) -> do
-                   putStrLn $ toString key ++ "\t" ++ formatTaskInfo ti
-          putStrLn $ "Total: " ++ formatDt total
+
+  qry <- case oQuery opts of
+           Just qryText -> case Parsec.parse pQuery "<command line>" qryText of
+                             Left err -> fail $ show err
+                             Right q -> return q
+           Nothing -> case getQuery (oQueryName opts) defs of
+                        Nothing -> fail "No specified query defined"
+                        Just q -> return q
+
+  let (tasks, total) = runProcess (dVariables defs) qry events
+  forM_ (M.assocs tasks) $ \(key, ti) -> do
+           putStrLn $ toString key ++ "\t" ++ formatTaskInfo ti
+  putStrLn $ "Total: " ++ formatDt total
 
