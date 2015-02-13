@@ -17,6 +17,9 @@ cabal-version:       >=1.8
 
 library
   exposed-modules:     XMonad.TimeTracker
+                       XMonad.TimeTracker.Types
+                       XMonad.TimeTracker.Syntax
+                       XMonad.TimeTracker.Eval
   -- other-modules:       
   build-depends:       base ==4.6.*,
                        stm ==2.4.*,
@@ -31,7 +34,9 @@ library
                        binary >=0.7,
                        regex-posix >=0.95,
                        xmonad >=0.12,
-                       xmonad-contrib >=0.12
+                       xmonad-contrib >=0.12,
+                       mtl >= 2.2.1,
+                       parsec >= 3
 
 executable xtt-dump
   main-is:             xtt-dump.hs
@@ -49,7 +54,8 @@ executable xtt-dump
                        binary >=0.7,
                        regex-posix >=0.95,
                        xmonad >=0.12,
-                       xmonad-contrib >=0.12
+                       xmonad-contrib >=0.12,
+                       parsec >= 3
 
 executable xtt-stats
   main-is:             xtt-stats.hs
@@ -68,5 +74,6 @@ executable xtt-stats
                        regex-posix >=0.95,
                        xmonad >=0.12,
                        xmonad-contrib >=0.12,
-                       mtl >= 2.2.1
+                       mtl >= 2.2.1,
+                       parsec >= 3
 
