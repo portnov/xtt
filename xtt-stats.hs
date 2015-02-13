@@ -15,6 +15,7 @@ import Text.Regex.Posix
 import XMonad.TimeTracker.Types
 import XMonad.TimeTracker.Eval
 import XMonad.TimeTracker.Syntax
+import XMonad.TimeTracker.Parser
 import XMonad.TimeTracker
 
 workTitles =
@@ -54,9 +55,9 @@ formatDt dt =
 qry :: Query
 qry = Query {
   qSelect = [],
-  qWhere = Or (StringProperty "title" `MatchAny` workTitles) $
-           Or (StringProperty "workspace" `MatchAny` workWorkspaces) $
-           StringProperty "class" `In` map (Lit . String) workClasses,
+  qWhere = Or (StringProperty "title" `matchAny` workTitles) $
+           Or (StringProperty "workspace" `matchAny` workWorkspaces) $
+           StringProperty "class" `isElem`  workClasses,
   qGroupBy = StringProperty "task"
 }
 

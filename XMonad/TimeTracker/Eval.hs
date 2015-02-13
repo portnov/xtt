@@ -14,12 +14,12 @@ import XMonad.TimeTracker.Syntax
 eval :: Expr -> TEvent -> Value
 eval (Lit val) _ = val
 eval (StringProperty prop) ev = String $ getStringProperty prop ev
+eval (Equals e (List es)) ev = Bool $ eval e ev `elem` [eval ex ev | ex <- es]
 eval (Equals e1 e2) ev = Bool $ eval e1 ev == eval e2 ev
-eval (Match e regex) ev = Bool $ toString (eval e ev) =~ regex
-eval (MatchAny e regexs) ev = Bool $ or [toString (eval e ev) =~ regex | regex <- regexs]
-eval (In e es) ev = Bool $ eval e ev `elem` [eval ex ev | ex <- es]
+eval (Match e regex) ev = Bool $ toString (eval e ev) =~ toString (eval regex ev)
 eval (Or e1 e2) ev = Bool $ (toBool $ eval e1 ev) || (toBool $ eval e2 ev)
 eval (And e1 e2) ev = Bool $ (toBool $ eval e1 ev) && (toBool $ eval e2 ev)
+eval (Identifier i) _ = error $ "Unknown identifier: " ++ i
 
 data TaskInfo =
   TaskInfo {

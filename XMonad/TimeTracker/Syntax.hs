@@ -1,17 +1,15 @@
 
 module XMonad.TimeTracker.Syntax where
 
-import Text.Parsec
-
 import XMonad.TimeTracker.Types
 
 data Expr =
     Lit Value
+  | Identifier String
+  | List [Expr]
   | StringProperty String
   | Equals Expr Expr
-  | Match Expr String
-  | MatchAny Expr [String]
-  | In Expr [Expr]
+  | Match Expr Expr
   | Or Expr Expr
   | And Expr Expr
   deriving (Eq,Show)
@@ -20,6 +18,12 @@ data Value =
     String String
   | Bool Bool
   deriving (Eq, Ord, Show)
+
+matchAny :: Expr -> [String] -> Expr
+matchAny expr regexs = Match expr $ List $ map (Lit . String) regexs
+
+isElem :: Expr -> [String] -> Expr
+isElem expr regexs = Equals expr $ List $ map (Lit . String) regexs
 
 toBool :: Value -> Bool
 toBool (Bool b) = b
@@ -35,6 +39,19 @@ data Query =
     , qWhere :: Expr
     , qGroupBy :: Expr
   }
+  deriving (Eq, Show)
+
+data VarDefinition = VarDefinition String Expr
+  deriving (Eq, Show)
+
+data QueryDefinition = QueryDefinition String Query
+  deriving (Eq, Show)
+
+data Definitions =
+    Definitions {
+      dVariables :: [(String, Expr)],
+      dQueries :: [(String, Query)]
+    }
   deriving (Eq, Show)
 
 getStringProperty :: String -> TEvent -> String
