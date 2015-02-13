@@ -2,6 +2,8 @@
 module XMonad.TimeTracker.Parser where
 
 import Control.Applicative ((<$>))
+import Control.Monad (when)
+import Data.Either
 import Text.Parsec
 import Text.Parsec.String
 import Text.Parsec.Expr
@@ -13,7 +15,7 @@ import XMonad.TimeTracker.Syntax
 
 xttDef = haskellDef {
            P.reservedOpNames = ["==", "=~", "&&", "||"],
-           P.reservedNames = ["let", "query", "select", "where", "group", "by"]
+           P.reservedNames = ["let", "query", "select", "where", "group", "by", "as"]
         }
 
 xttTokenParser :: P.TokenParser ()
@@ -26,7 +28,9 @@ stringLiteral = P.stringLiteral xttTokenParser
 whitespace = P.whiteSpace xttTokenParser
 symbol = P.symbol xttTokenParser
 comma = P.comma xttTokenParser
+semicolon = P.semi xttTokenParser
 reservedOp = P.reservedOp xttTokenParser
+reserved = P.reserved xttTokenParser
 
 pValue :: Parser Value
 pValue =
@@ -71,6 +75,65 @@ table = [ [binary "=~" Match AssocNone, binary "==" Equals AssocNone],
 
 binary name fun assoc = Infix (try (reservedOp name) >> return fun) assoc
 
+pVarDefinition :: Parser VarDefinition
+pVarDefinition = do
+  reserved "let"
+  name <- identifier
+  reservedOp "="
+  expr <- pExpr
+  return $ VarDefinition name expr
+
+pQuery :: Parser Query
+pQuery = do
+  where_ <- option (Lit $ Bool True) $ do
+                reserved "where"
+                pExpr
+  reserved "group"
+  reserved "by"
+  grouping <- pGrouping `sepBy` comma
+  when (null grouping) $
+      fail "At least one group by parameter must be specified"
+  let ((_,top):other) = grouping
+  return $ Query other where_ top
+
+pGrouping :: Parser (String, Expr)
+pGrouping = do
+  expr <- pExpr
+  name <- option (pPrint expr) $ do
+             reserved "as"
+             identifier
+  return (name, expr)
+
+pQueryDefinition :: Parser QueryDefinition
+pQueryDefinition = do
+  reserved "query"
+  name <- identifier
+  reservedOp "="
+  qry <- pQuery
+  return $ QueryDefinition name qry
+
+pDefinitions :: Parser Definitions
+pDefinitions = do
+  whitespace
+  lst <- ((Left <$> try pVarDefinition) <|>
+          (Right <$> try pQueryDefinition))
+         `sepEndBy` semicolon
+  eof
+  return $ Definitions {
+             dVariables = lefts lst,
+             dQueries   = rights lst
+           }
+
 testExpr :: String -> IO ()
 testExpr = parseTest (do {e <- pExpr ; eof ; return e})
+
+testQry :: String -> IO ()
+testQry = parseTest (do {e <- pQueryDefinition ; eof ; return e})
+
+parseFile :: FilePath -> IO Definitions
+parseFile path = do
+  input <- readFile path
+  case parse pDefinitions path input of
+    Left err -> fail $ show err
+    Right ds -> return ds
 

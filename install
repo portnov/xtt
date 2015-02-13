@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cp dist/build/xtt-dump/xtt-dump ~/bin
+cp dist/build/xtt-stats/xtt-stats ~/bin

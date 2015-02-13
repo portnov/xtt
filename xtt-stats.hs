@@ -18,24 +18,6 @@ import XMonad.TimeTracker.Syntax
 import XMonad.TimeTracker.Parser
 import XMonad.TimeTracker
 
-workTitles =
-  ["Remmina", "RadixWare Designer",
-   "Oracle SQL Developer",
-   "RadixWare Manager", "NetBeans", "Compass Plus Ltd"]
-
-workWorkspaces =
-  ["work", "RX Explorer"]
-
-workClasses =
-  ["Qt Jambi application", "Remmina"]
-
-isWork :: TEvent -> Bool
-isWork ev =
-  or [eWindowTitle ev =~ regex | regex <- workTitles] ||
-  or [eWorkspace ev =~ regex | regex <- workWorkspaces] ||
-  or [eWindowClass ev == regex | regex <- workClasses]
-
-
 formatDt :: NominalDiffTime -> String
 formatDt dt = 
     let ns = go (floor dt) [60, 60, 24]
@@ -51,25 +33,6 @@ formatDt dt =
     zip0 _ [] = []
     zip0 (0:ns) (_:cs) = zip0 ns cs
     zip0 (n:ns) (c:cs) = (show n ++ [c]) : zip0 ns cs
-
-qry :: Query
-qry = Query {
-  qSelect = [],
-  qWhere = Or (StringProperty "title" `matchAny` workTitles) $
-           Or (StringProperty "workspace" `matchAny` workWorkspaces) $
-           StringProperty "class" `isElem`  workClasses,
-  qGroupBy = StringProperty "task"
-}
-
-qry2 :: Query
-qry2 = qry {qSelect = [("TITLE", StringProperty "title"), ("CLASS", StringProperty "class")]}
-
-qry3 :: Query
-qry3 = Query {
-  qSelect = [("TITLE", StringProperty "title")],
-  qWhere = Lit (Bool True),
-  qGroupBy = StringProperty "workspace"
-}
 
 formatTaskInfo :: TaskInfo -> String
 formatTaskInfo ti =
@@ -88,7 +51,11 @@ main = do
                 _ -> fail $ "Synopsis: xtt-stats [filename.dat]"
   dat <- BL.readFile filename
   let events = runGet readEvents dat
-  let tasks = runProcess qry2 events
-  forM_ (M.assocs tasks) $ \(key, ti) -> do
-      putStrLn $ toString key ++ "\t" ++ formatTaskInfo ti
+  defs <- parseFile "sample.xtt"
+  case getQuery "qry2" defs of
+    Nothing -> putStrLn "No default query"
+    Just qry -> do
+          let tasks = runProcess (dVariables defs) qry events
+          forM_ (M.assocs tasks) $ \(key, ti) -> do
+              putStrLn $ toString key ++ "\t" ++ formatTaskInfo ti
 

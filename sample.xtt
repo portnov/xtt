@@ -1,0 +1,31 @@
+
+let workTitles =
+  ["GVIM", "Gnome-terminal"]
+;
+
+let workWorkspaces =
+  ["term", "text"]
+;
+
+let workClasses =
+  [] ;
+
+let isWork =
+    $title =~ workTitles ||
+    $workspace =~ workWorkspaces ||
+    $class == workClasses
+;
+
+query default =
+  where isWork
+  group by $task
+;
+
+query qry2 =
+  where isWork
+  group by $task, $title, $class
+;
+
+query qry3 =
+  group by $workspace, $title
+;

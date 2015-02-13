@@ -11,15 +11,24 @@ import Text.Regex.Posix
 import XMonad.TimeTracker.Types
 import XMonad.TimeTracker.Syntax
 
-eval :: Expr -> TEvent -> Value
-eval (Lit val) _ = val
-eval (StringProperty prop) ev = String $ getStringProperty prop ev
-eval (Equals e (List es)) ev = Bool $ eval e ev `elem` [eval ex ev | ex <- es]
-eval (Equals e1 e2) ev = Bool $ eval e1 ev == eval e2 ev
-eval (Match e regex) ev = Bool $ toString (eval e ev) =~ toString (eval regex ev)
-eval (Or e1 e2) ev = Bool $ (toBool $ eval e1 ev) || (toBool $ eval e2 ev)
-eval (And e1 e2) ev = Bool $ (toBool $ eval e1 ev) && (toBool $ eval e2 ev)
-eval (Identifier i) _ = error $ "Unknown identifier: " ++ i
+eval :: [(String, Expr)] -> Expr -> TEvent -> Value
+eval vars expr ev = go expr
+  where
+    go (Lit val) = val
+    go (StringProperty prop) = String $ getStringProperty prop ev
+    go (Equals e (List es)) = Bool $ go e `elem` [go ex | ex <- es]
+    go (Equals e1 e2) = Bool $ go e1 == go e2 
+    go (Match e (List regexs)) = Bool $ or [e' =~ regex' | regex' <- concatMap toStrings (map go regexs), 
+                                                           e' <- toStrings (go e)]
+    go (Match e regex) = Bool $ or [e' =~ regex' | regex' <- toStrings (go regex), e' <- toStrings (go e)]
+    go (Or e1 e2) = Bool $ (toBool $ go e1) || (toBool $ go e2)
+    go (And e1 e2) = Bool $ (toBool $ go e1) && (toBool $ go e2)
+    go (List es) = LitList $ map go es
+    go (Identifier i) =
+      case lookup i vars of
+        Just val -> go val
+        Nothing  -> error $ "Unknown identifier: " ++ i
+    go x = error $ show x
 
 data TaskInfo =
   TaskInfo {
@@ -68,12 +77,13 @@ putData key dt fields = do
         newResult = M.insertWith updateTask key newTask (psResult st)
     in  st {psResult = newResult}
 
-process :: Expr -> Expr -> [(String,Expr)] -> TEvent -> St.State ParserState ()
-process selector key fields ev = do
+process :: [VarDefinition] -> Expr -> Expr -> [(String,Expr)] -> TEvent -> St.State ParserState ()
+process vars selector key fields ev = do
   st <- St.get
-  let good = toBool . eval selector
-      getKey = eval key
-      evalFields e = M.fromList [(n, eval f e) | (n,f) <- fields]
+  let vars' = [(name,value) | VarDefinition name value <- vars]
+      good = toBool . eval vars' selector
+      getKey = eval vars' key
+      evalFields e = M.fromList [(n, eval vars' f e) | (n,f) <- fields]
   case psPrevEvent st of
     Nothing -> return ()
     Just prevEvent -> do
@@ -84,11 +94,11 @@ process selector key fields ev = do
       St.put $ st {psCurrentTask = eTask ev, psStartTime = Just (eTimestamp ev)}
   St.modify $ \st -> st {psPrevEvent = Just ev}
 
-processAll :: Expr -> Expr -> [(String,Expr)] -> [TEvent] -> St.State ParserState ()
-processAll selector key fields events = mapM_ (process selector key fields) events
+processAll :: [VarDefinition] -> Expr -> Expr -> [(String,Expr)] -> [TEvent] -> St.State ParserState ()
+processAll vars selector key fields events = mapM_ (process vars selector key fields) events
 
-runProcess :: Query -> [TEvent] -> M.Map Value TaskInfo
-runProcess q events = 
-  let st = St.execState (processAll (qWhere q) (qGroupBy q) (qSelect q) events) emptyPS
+runProcess :: [VarDefinition] -> Query -> [TEvent] -> M.Map Value TaskInfo
+runProcess vars q events = 
+  let st = St.execState (processAll vars (qWhere q) (qGroupBy q) (qSelect q) events) emptyPS
   in  psResult st
 
