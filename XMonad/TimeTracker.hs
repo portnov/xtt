@@ -1,0 +1,154 @@
+{-# LANGUAGE DeriveGeneric, TypeSynonymInstances, FlexibleInstances, DeriveDataTypeable #-}
+
+module XMonad.TimeTracker where
+
+import Control.Monad
+import qualified Control.Exception as E
+import Control.Concurrent
+import Control.Concurrent.STM
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Map as M
+import qualified Data.HashMap.Strict as H
+import qualified Data.Text as T
+import qualified Data.Vector as V
+import Data.Maybe
+import Data.Int
+import Data.Typeable
+import Data.Time
+import System.Environment (getEnv)
+import System.Directory (doesFileExist)
+import System.FilePath ((</>))
+import System.IO
+import Data.Binary as Binary
+import Data.Binary.Get (isEmpty)
+import GHC.Generics (Generic)
+import Text.Regex.Posix
+
+import XMonad
+import qualified XMonad.Util.ExtensibleState as XS
+import qualified XMonad.StackSet as W
+import XMonad.Prompt
+import XMonad.Prompt.Input
+import XMonad.Actions.ShowText
+
+data TEvent = TEvent {
+       eTimestamp :: UTCTime
+     , eTask :: String
+     , eWindowTitle :: String
+     , eWindowClass :: String
+     , eWorkspace :: String
+     }
+   | Quit
+   deriving (Show, Generic, Typeable)
+
+instance Eq TEvent where
+  e1 == e2 =
+    (eTask e1 == eTask e2) &&
+    (eWindowTitle e1 == eWindowTitle e2) &&
+    (eWindowClass e1 == eWindowClass e2) &&
+    (eWorkspace e1 == eWorkspace e2)
+
+instance Binary UTCTime where
+ put (UTCTime (ModifiedJulianDay d) t) = do
+        Binary.put d
+        Binary.put (toRational t)
+ get = do
+        d <- Binary.get
+        t <- Binary.get
+        return $ UTCTime (ModifiedJulianDay d) ({-# SCC diffTimeFromRational #-} fromRational t)
+
+instance Binary TEvent
+
+data Tracker = Tracker {
+      trackerChan :: TChan TEvent,
+      trackerTask :: String
+    }
+    | NoTracker
+    deriving (Typeable)
+
+instance ExtensionClass Tracker where
+  initialValue = NoTracker
+
+defaultTrackerLog :: IO FilePath
+defaultTrackerLog = do
+  home <- getEnv "HOME"
+  return $ home </> ".xmonad" </> "tracker.dat"
+
+trackerInit :: FilePath -> X ()
+trackerInit path = do
+  chan <- io $ atomically $ newTChan
+  file <- io $ openFile path AppendMode
+  io $ forkIO $ writer chan file
+  let tracker = Tracker chan "Startup"
+  XS.put tracker
+
+writer :: TChan TEvent -> Handle -> IO ()
+writer chan file = go Nothing
+  where
+    go lastEv = do
+      ev <- atomically $ readTChan chan
+      case ev of
+        Quit -> hClose file
+        _ -> do
+             when (Just ev /= lastEv) $ do
+               BL.hPut file $ encode ev
+               hFlush file
+             go (Just ev)
+
+trackerHook :: X ()
+trackerHook = do
+  tracker <- XS.get
+  let chan = trackerChan tracker
+  withWindowSet $ \ss -> do
+    whenJust (W.peek ss) $ \window -> do
+      time <- io $ getCurrentTime
+      cls <- runQuery className window
+      winTitle <- runQuery title window
+      let event = TEvent {
+                    eTimestamp = time,
+                    eTask = trackerTask tracker,
+                    eWindowTitle = winTitle,
+                    eWindowClass = cls,
+                    eWorkspace = W.currentTag ss }
+      io $ atomically $ writeTChan chan event
+
+trackerSetTask :: String -> X ()
+trackerSetTask task = do
+  tracker <- XS.get
+  XS.put $ tracker {trackerTask = task}
+
+promptTrackerTask :: XPConfig -> X ()
+promptTrackerTask xpc = do
+  x <- inputPrompt xpc "Task"
+  whenJust x $ \task -> do
+    trackerSetTask task
+
+readEvents :: Binary.Get [TEvent]
+readEvents = do
+  empty <- isEmpty
+  if empty
+    then return []
+    else do
+         ev <- Binary.get
+         rest <- readEvents
+         return (ev : rest)
+
+matchOne :: String -> String -> Maybe String
+matchOne title regex =
+  let (before, r, after, groups) = title =~ regex :: (String, String, String, [String])
+  in  if null groups
+        then Nothing
+        else Just (head groups)
+
+matchMultiple :: String -> [String] -> Maybe String
+matchMultiple title regexs = msum [title `matchOne` regex | regex <- regexs]
+
+grabWindowTitle :: [String] -> X ()
+grabWindowTitle regexs = do
+  withWindowSet $ \ss -> do
+    whenJust (W.peek ss) $ \window -> do
+    winTitle <- runQuery title window
+    whenJust (matchMultiple winTitle regexs) $ \task -> do
+        trackerSetTask task
+        flashText (def :: ShowTextConfig) 3 task
+
