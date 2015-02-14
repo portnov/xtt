@@ -19,6 +19,7 @@ let isWork =
 let smth = case
              when $class == "Gnome-terminal" then "terminal"
              when $title =~ "GVIM" then "gvim"
+             when $workspace != "inet" then "not internet"
              else "other"
 ;
 

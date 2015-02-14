@@ -12,6 +12,7 @@ data Expr =
   | StringProperty String
   | Equals Expr Expr
   | Match Expr Expr
+  | Not Expr
   | Or Expr Expr
   | And Expr Expr
   | Case [(Expr, Expr)] Expr
@@ -26,6 +27,7 @@ pPrint (Equals e1 e2) = pPrint e1 ++ "==" ++ pPrint e2
 pPrint (Match e1 e2) = pPrint e1 ++ "=~" ++ pPrint e2
 pPrint (Or e1 e2) = pPrint e1 ++ "||" ++ pPrint e2
 pPrint (And e1 e2) = pPrint e1 ++ "&&" ++ pPrint e2
+pPrint (Not e) = "!" ++ pPrint e
 pPrint (Case pairs def) = "case " ++ unlines (map go pairs) ++ " else " ++ pPrint def
   where
     go (cond, val) = " when " ++ pPrint cond ++ " then " ++ pPrint val

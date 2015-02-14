@@ -87,10 +87,15 @@ term = parens pExpr
    <|> pStringProperty
    <?> "simple expression"
 
-table = [ [binary "=~" Match AssocNone, binary "==" Equals AssocNone],
+table = [ [prefix "!" Not],
+          [binary "=~" Match AssocNone, binary "==" Equals AssocNone,
+           binary "!=" notEquals AssocNone],
           [binary "||" Or AssocLeft, binary "&&" And AssocLeft] ]
 
 binary name fun assoc = Infix (try (reservedOp name) >> return fun) assoc
+prefix name fun = Prefix (try (reservedOp name) >> return fun)
+
+notEquals e1 e2 = Not (Equals e1 e2)
 
 pVarDefinition :: Parser VarDefinition
 pVarDefinition = do

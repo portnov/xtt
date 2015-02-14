@@ -24,6 +24,7 @@ eval vars expr ev = go expr
     go (Or e1 e2) = Bool $ (toBool $ go e1) || (toBool $ go e2)
     go (And e1 e2) = Bool $ (toBool $ go e1) && (toBool $ go e2)
     go (List es) = LitList $ map go es
+    go (Not e) = Bool $ not $ toBool $ go e
     go (Identifier i) =
       case lookup i vars of
         Just val -> go val
