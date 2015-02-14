@@ -29,6 +29,18 @@ let gvimFilename =
        else "none"
 ;
 
+let date =
+  case when $timestamp =~ today then "today"
+       when $timestamp =~ yesterday then "yesterday"
+       else "old"
+;
+
+let duration =
+  case when $duration < 1s then "short"
+       when $duration > 1h then "long"
+       else "other"
+;
+
 query default =
   where isWork
   group by $task

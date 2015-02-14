@@ -37,6 +37,8 @@ library
                        xmonad >=0.12,
                        xmonad-contrib >=0.12,
                        mtl >= 2.2.1,
+                       transformers,
+                       dates >= 0.2.2.0,
                        parsec >= 3
 
 executable xtt-dump
@@ -56,6 +58,7 @@ executable xtt-dump
                        regex-posix >=0.95,
                        xmonad >=0.12,
                        xmonad-contrib >=0.12,
+                       dates >= 0.2.2.0,
                        parsec >= 3
 
 executable xtt-stats
@@ -76,6 +79,8 @@ executable xtt-stats
                        xmonad >=0.12,
                        xmonad-contrib >=0.12,
                        mtl >= 2.2.1,
+                       transformers,
                        parsec >= 3,
+                       dates >= 0.2.2.0,
                        optparse-applicative
 

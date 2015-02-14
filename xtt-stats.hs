@@ -17,7 +17,7 @@ import Text.Regex.Posix
 import XMonad.TimeTracker.Types
 import XMonad.TimeTracker.Eval
 import XMonad.TimeTracker.Syntax
-import XMonad.TimeTracker.Parser
+import qualified XMonad.TimeTracker.Parser as P 
 import XMonad.TimeTracker
 
 formatDt :: NominalDiffTime -> String
@@ -86,17 +86,15 @@ realMain :: Options -> IO ()
 realMain opts = do
   dat <- BL.readFile (oLogFilename opts)
   let events = runGet readEvents dat
-  defs <- parseFile (oDefsFilename opts)
+  defs <- P.parseFile (oDefsFilename opts)
 
   qry <- case oQuery opts of
-           Just qryText -> case Parsec.parse pQuery "<command line>" qryText of
-                             Left err -> fail $ show err
-                             Right q -> return q
+           Just qryText -> P.runParser P.pQuery "<command line>" qryText
            Nothing -> case getQuery (oQueryName opts) defs of
                         Nothing -> fail "No specified query defined"
                         Just q -> return q
 
-  let (tasks, total) = runProcess (dVariables defs) qry events
+  (tasks, total) <- runProcess (dVariables defs) qry events
   forM_ (M.assocs tasks) $ \(key, ti) -> do
            putStrLn $ toString key ++ "\t" ++ formatTaskInfo ti
   putStrLn $ "Total: " ++ formatDt total

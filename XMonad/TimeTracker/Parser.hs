@@ -3,22 +3,34 @@ module XMonad.TimeTracker.Parser where
 
 import Control.Applicative ((<$>))
 import Control.Monad (when)
+import Control.Monad.Reader
 import Data.Either
-import Text.Parsec
-import Text.Parsec.String
+import qualified Data.Dates as D
+import Text.Parsec hiding (runParser)
+-- import Text.Parsec.String
 import Text.Parsec.Expr
 import qualified Text.Parsec.Token as P
-import Text.Parsec.Language (haskellDef)
+-- import Text.Parsec.Language (haskellDef)
 
 import XMonad.TimeTracker.Types
 import XMonad.TimeTracker.Syntax
 
-xttDef = haskellDef {
+xttDef :: P.GenLanguageDef String () (Reader D.DateTime)
+xttDef = P.LanguageDef {
+           P.commentStart = "{-",
+           P.commentEnd = "-}",
+           P.commentLine = "--",
+           P.nestedComments = True,
+           P.identStart = letter,
+           P.identLetter = alphaNum <|> oneOf "_'",
+           P.opStart = P.opLetter xttDef,
+           P.opLetter = oneOf ":!#$%*+./<=>?@\\^|-~",
            P.reservedOpNames = ["==", "=~", "&&", "||", "!", "!=", "@"],
-           P.reservedNames = ["let", "query", "select", "where", "group", "by", "as", "case", "when", "then"]
+           P.reservedNames = ["let", "query", "select", "where", "group", "by", "as", "case", "when", "then"],
+           P.caseSensitive = True
         }
 
-xttTokenParser :: P.TokenParser ()
+xttTokenParser :: P.GenTokenParser String () (Reader D.DateTime)
 xttTokenParser = P.makeTokenParser xttDef
 
 parens = P.parens xttTokenParser
@@ -31,13 +43,51 @@ comma = P.comma xttTokenParser
 semicolon = P.semi xttTokenParser
 reservedOp = P.reservedOp xttTokenParser
 reserved = P.reserved xttTokenParser
+number = P.decimal xttTokenParser
+lexeme = P.lexeme xttTokenParser
+
+type Parser a = ParsecT String () (Reader D.DateTime) a
 
 pValue :: Parser Value
 pValue =
   try (String <$> regex1Literal <?> "regex literal 1") <|>
   try (String <$> regex2Literal <?> "regex literal 2") <|>
+  try (DateTime <$> dateTimeLiteral <?> "date/time literal") <|>
+  try (Time <$> timeLiteral <?> "time literal") <|>
+  try (Time <$> durationLiteral <?> "duration literal") <|>
+  try (WeekDay <$> weekdayLiteral <?> "weekday literal") <|>
   try (String <$> stringLiteral) <|>
   (Bool <$> (boolLiteral <?> "boolean literal"))
+
+weekdayLiteral :: Parser D.WeekDay
+weekdayLiteral =
+        use D.Monday <|> use D.Tuesday <|> use D.Wednesday
+    <|> use D.Thursday <|> use D.Friday <|> use D.Saturday <|> use D.Sunday
+  where
+    use wd = try (symbol (show wd) >> return wd)
+
+dateTimeLiteral :: Parser D.DateTime
+dateTimeLiteral = lexeme (ask >>= D.pDateTime)
+
+durationLiteral :: Parser D.Time
+durationLiteral = do
+    ds <- many1 step
+    whitespace
+    return $ foldr plus (D.Time 0 0 0) ds
+  where
+    plus (D.Time h1 m1 s1) (D.Time h2 m2 s2) = {- normalizeTime $ -} D.Time (h1+h2) (m1+m2) (s1+s2)
+
+    step = do
+      n <- fromIntegral <$> number
+      c <- oneOf "hms"
+      case c of
+        'h' -> return $ D.Time n 0 0
+        'm' -> return $ D.Time 0 n 0
+        's' -> return $ D.Time 0 0 n
+        _ -> fail "Impossible"
+
+timeLiteral :: Parser D.Time
+timeLiteral = lexeme D.pTime
 
 regex1Literal :: Parser String
 regex1Literal = do
@@ -97,23 +147,36 @@ pCase = do
       expr <- pExpr
       return (cond, expr)
 
+pTimestamp = do
+  char '$'
+  symbol "timestamp"
+  return Timestamp
+
+pDuration = do
+  char '$'
+  symbol "duration"
+  return Duration
+
 term = parens pExpr
    <|> pList
    <|> pLiteral
    <|> pIdentifier
+   <|> (try pTimestamp <?> "$timestamp")
+   <|> (try pDuration <?> "$duration")
    <|> pStringProperty
    <?> "simple expression"
 
 table = [ [prefix "!" Not],
           [binary "@" Cut AssocNone],
           [binary "=~" Match AssocNone, binary "==" Equals AssocNone,
-           binary "!=" notEquals AssocNone],
+           binary "<=" Lte AssocNone, binary "<" Lt AssocNone,
+           binary ">=" Gte AssocNone, binary ">" Gt AssocNone,
+           binaryNot "!=" Equals AssocNone, binaryNot "/=" Equals AssocNone],
           [binary "||" Or AssocLeft, binary "&&" And AssocLeft] ]
 
-binary name fun assoc = Infix (try (reservedOp name) >> return fun) assoc
+binary name fun assoc = Infix (try (reservedOp name) >> return (\e1 e2 -> BinOp fun e1 e2)) assoc
+binaryNot name fun assoc = Infix (try (reservedOp name) >> return (\e1 e2 -> Not (BinOp fun e1 e2))) assoc
 prefix name fun = Prefix (try (reservedOp name) >> return fun)
-
-notEquals e1 e2 = Not (Equals e1 e2)
 
 pVarDefinition :: Parser VarDefinition
 pVarDefinition = do
@@ -164,16 +227,28 @@ pDefinitions = do
              dQueries   = rights lst
            }
 
+runTest :: Show a => Parser a -> String -> IO ()
+runTest p str = do
+  t <- D.getCurrentDateTime
+  case runReader (runParserT p () "<input>" str) t of
+    Right r -> print r
+    Left err -> fail $ show err
+
 testExpr :: String -> IO ()
-testExpr = parseTest (do {e <- pExpr ; eof ; return e})
+testExpr = runTest (do {e <- pExpr ; eof ; return e})
 
 testQry :: String -> IO ()
-testQry = parseTest (do {e <- pQueryDefinition ; eof ; return e})
+testQry = runTest (do {e <- pQueryDefinition ; eof ; return e})
+
+runParser :: Parser a -> FilePath -> String -> IO a
+runParser p path str = do
+  t <- D.getCurrentDateTime
+  case runReader (runParserT p () path str) t of
+    Left err -> fail $ show err
+    Right ds -> return ds
 
 parseFile :: FilePath -> IO Definitions
 parseFile path = do
   input <- readFile path
-  case parse pDefinitions path input of
-    Left err -> fail $ show err
-    Right ds -> return ds
+  runParser pDefinitions path input
 
