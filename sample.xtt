@@ -24,6 +24,11 @@ let smth = case
              else "other"
 ;
 
+let gvimFilename =
+  case when $title =~ "GVIM" then $title @ "^\\w+"
+       else "none"
+;
+
 query default =
   where isWork
   group by $task

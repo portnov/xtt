@@ -12,6 +12,7 @@ data Expr =
   | StringProperty String
   | Equals Expr Expr
   | Match Expr Expr
+  | Cut Expr Expr
   | Not Expr
   | Or Expr Expr
   | And Expr Expr
@@ -25,6 +26,7 @@ pPrint (List es) = "[" ++ intercalate ", " (map pPrint es) ++ "]"
 pPrint (StringProperty p) = "$" ++ p
 pPrint (Equals e1 e2) = pPrint e1 ++ "==" ++ pPrint e2
 pPrint (Match e1 e2) = pPrint e1 ++ "=~" ++ pPrint e2
+pPrint (Cut e1 e2) = pPrint e1 ++ " @ " ++ pPrint e2
 pPrint (Or e1 e2) = pPrint e1 ++ "||" ++ pPrint e2
 pPrint (And e1 e2) = pPrint e1 ++ "&&" ++ pPrint e2
 pPrint (Not e) = "!" ++ pPrint e
@@ -52,6 +54,7 @@ toBool (LitList lst) = not (null lst)
 toString :: Value -> String
 toString (String s) = s
 toString (Bool b) = show b
+toString (LitList [x]) = toString x
 toString (LitList xs) = error $ "Unsupported nested list: " ++ show xs
 
 toStrings :: Value -> [String]

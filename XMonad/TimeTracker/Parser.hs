@@ -14,7 +14,7 @@ import XMonad.TimeTracker.Types
 import XMonad.TimeTracker.Syntax
 
 xttDef = haskellDef {
-           P.reservedOpNames = ["==", "=~", "&&", "||"],
+           P.reservedOpNames = ["==", "=~", "&&", "||", "!", "!=", "@"],
            P.reservedNames = ["let", "query", "select", "where", "group", "by", "as", "case", "when", "then"]
         }
 
@@ -88,6 +88,7 @@ term = parens pExpr
    <?> "simple expression"
 
 table = [ [prefix "!" Not],
+          [binary "@" Cut AssocNone],
           [binary "=~" Match AssocNone, binary "==" Equals AssocNone,
            binary "!=" notEquals AssocNone],
           [binary "||" Or AssocLeft, binary "&&" And AssocLeft] ]

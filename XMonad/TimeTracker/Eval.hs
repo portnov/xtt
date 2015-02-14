@@ -21,6 +21,8 @@ eval vars expr ev = go expr
     go (Match e (List regexs)) = Bool $ or [e' =~ regex' | regex' <- concatMap toStrings (map go regexs), 
                                                            e' <- toStrings (go e)]
     go (Match e regex) = Bool $ or [e' =~ regex' | regex' <- toStrings (go regex), e' <- toStrings (go e)]
+    go (Cut e (List regexs)) = LitList [String $ cut (toString $ go e) (toString $ go regex) | regex <- regexs]
+    go (Cut e regex) = String $ cut (toString $ go e) (toString $ go regex)
     go (Or e1 e2) = Bool $ (toBool $ go e1) || (toBool $ go e2)
     go (And e1 e2) = Bool $ (toBool $ go e1) && (toBool $ go e2)
     go (List es) = LitList $ map go es
@@ -33,6 +35,11 @@ eval vars expr ev = go expr
       case [expr | (cond, expr) <- pairs, toBool (go cond)] of
         [] -> go def
         (e:_) -> go e
+
+cut :: String -> String -> String
+cut str regex =
+  let (_,result,_) = str =~ regex :: (String, String, String)
+  in  result
 
 data TaskInfo =
   TaskInfo {
