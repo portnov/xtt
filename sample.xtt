@@ -25,7 +25,7 @@ let smth = case
 ;
 
 let gvimFilename =
-  case when $title =~ "GVIM" then $title @ "^\\w+"
+  case when $title =~ "GVIM" then $title @ /^\w+/
        else "none"
 ;
 

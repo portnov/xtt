@@ -34,8 +34,25 @@ reserved = P.reserved xttTokenParser
 
 pValue :: Parser Value
 pValue =
+  try (String <$> regex1Literal <?> "regex literal 1") <|>
+  try (String <$> regex2Literal <?> "regex literal 2") <|>
   try (String <$> stringLiteral) <|>
-    (Bool <$> (boolLiteral <?> "boolean literal"))
+  (Bool <$> (boolLiteral <?> "boolean literal"))
+
+regex1Literal :: Parser String
+regex1Literal = do
+  char '/'
+  res <- manyTill anyChar (try $ char '/')
+  whitespace
+  return res
+
+regex2Literal :: Parser String
+regex2Literal = do
+  char 'm'
+  sep <- anyChar
+  res <- manyTill anyChar (char sep)
+  whitespace
+  return res
 
 boolLiteral :: Parser Bool
 boolLiteral =
