@@ -41,6 +41,13 @@ let duration =
        else "other"
 ;
 
+let timeOfDay =
+  case when $timestamp > 08:00 && $timestamp < 12:00 then "morning"
+       when $timestamp >= 12:00 && $timestamp < 18:00 then "day"
+       when $timestamp >= 18:00 && $timestamp < 22:00 then "evening"
+       else "night"
+;
+
 query default =
   where isWork
   group by $task

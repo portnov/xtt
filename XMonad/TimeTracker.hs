@@ -77,6 +77,7 @@ writer chan file = go Nothing
 
 trackerHook :: X ()
 trackerHook = do
+  currentZone <- io getCurrentTimeZone
   tracker <- XS.get
   let chan = trackerChan tracker
   withWindowSet $ \ss -> do
@@ -84,18 +85,21 @@ trackerHook = do
       time <- io $ getCurrentTime
       cls <- runQuery className window
       winTitle <- runQuery title window
-      let event = TEvent {
-                    eTimestamp = time,
-                    eTask = trackerTask tracker,
+      let event = BaseEvent {
+                    eTimestamp = ZonedUTC time currentZone,
                     eWindowTitle = winTitle,
                     eWindowClass = cls,
+                    eAtoms = [],
+                    eIdleTime = 0,
                     eWorkspace = W.currentTag ss }
       io $ atomically $ writeTChan chan event
 
 trackerSetTask :: String -> X ()
 trackerSetTask task = do
   tracker <- XS.get
-  XS.put $ tracker {trackerTask = task}
+  let chan = trackerChan tracker
+  let event = SetMeta "task" task
+  io $ atomically $ writeTChan chan event
 
 promptTrackerTask :: XPConfig -> X ()
 promptTrackerTask xpc = do
@@ -103,14 +107,14 @@ promptTrackerTask xpc = do
   whenJust x $ \task -> do
     trackerSetTask task
 
-readEvents :: Binary.Get [TEvent]
-readEvents = do
+readEvList :: Binary a => Binary.Get [a]
+readEvList = do
   empty <- isEmpty
   if empty
     then return []
     else do
          ev <- Binary.get
-         rest <- readEvents
+         rest <- readEvList
          return (ev : rest)
 
 matchOne :: String -> String -> Maybe String

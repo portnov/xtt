@@ -85,7 +85,7 @@ main = do
 realMain :: Options -> IO ()
 realMain opts = do
   dat <- BL.readFile (oLogFilename opts)
-  let events = runGet readEvents dat
+  let events = runGet readEvList dat
   defs <- P.parseFile (oDefsFilename opts)
 
   qry <- case oQuery opts of

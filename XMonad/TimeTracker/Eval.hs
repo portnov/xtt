@@ -16,20 +16,18 @@ import XMonad.TimeTracker.Types
 import XMonad.TimeTracker.Syntax
 
 data ParserState = PS {
-      psCurrentTask :: String
-    , psStartTime :: Maybe UTCTime
+      psCurrentMeta :: M.Map String String
     , psPrevEvent :: Maybe TEvent
     , psTotalTime :: NominalDiffTime
     , psVariables :: [(String, Expr)]
-    , psTimestamp :: UTCTime
+    , psTimestamp :: ZonedUTC
     , psDuration :: NominalDiffTime
     , psResult :: M.Map Value TaskInfo
     } deriving (Eq, Show)
 
 emptyPS :: ParserState
 emptyPS = PS {
-  psCurrentTask = "Startup",
-  psStartTime = Nothing,
+  psCurrentMeta = M.singleton "task" "Startup",
   psPrevEvent = Nothing,
   psVariables = [],
   psDuration = 0,
@@ -49,6 +47,15 @@ utcTime2dateTime utc = do
       time = D.Time (todHour day) (todMin day) (round $ todSec day)
   return $ D.addTime date time
 
+zonedUtc2dateTime :: ZonedUTC -> IO D.DateTime
+zonedUtc2dateTime (ZonedUTC utc _) = do
+  currentZone <- getCurrentTimeZone
+  let lt = utcToLocalTime currentZone utc
+      date = D.dayToDateTime (localDay lt)
+      day = localTimeOfDay lt
+      time = D.Time (todHour day) (todMin day) (round $ todSec day)
+  return $ D.addTime date time
+
 -- To be moved to Data.Dates
 seconds2Time :: Int -> D.Time
 seconds2Time x =
@@ -59,6 +66,10 @@ seconds2Time x =
 -- To be moved to Data.Dates
 nominalDiffTime2Time :: NominalDiffTime -> D.Time
 nominalDiffTime2Time dt = seconds2Time $ round dt
+
+-- To be moved to Data.Dates
+getTime :: D.DateTime -> D.Time
+getTime dt = D.Time (D.hour dt) (D.minute dt) (D.second dt)
 
 eval :: Expr -> TEvent -> EvalM Value
 eval expr ev = go expr
@@ -76,7 +87,7 @@ eval expr ev = go expr
         Nothing  -> fail $ "Unknown identifier: " ++ i
     go Timestamp = do
       t <- St.gets psTimestamp
-      liftIO $ DateTime <$> utcTime2dateTime t
+      liftIO $ DateTime <$> zonedUtc2dateTime t
     go Duration = do
       dt <- St.gets psDuration
       return $ Time $ nominalDiffTime2Time dt
@@ -165,6 +176,8 @@ eval expr ev = go expr
       case (e1', e2') of
         (Time t1, Time t2) -> return $ Bool $ t1 `op` t2
         (DateTime dt1, DateTime dt2) -> return $ Bool $ dt1 `op` dt2
+        (Time t, DateTime d) -> return $ Bool $ t `op` getTime d
+        (DateTime d, Time t) -> return $ Bool $ getTime d `op` t
         (Int n1, Int n2) -> return $ Bool $ n1 `op` n2
         (Int n, Time t) -> return $ Bool $ n `op` duration2int t
         (Time t, Int n) -> return $ Bool $ duration2int t `op` n
@@ -217,7 +230,13 @@ putData key dt fields = do
         newResult = M.insertWith updateTask key newTask (psResult st)
     in  st {psResult = newResult}
 
+diffZonedUtc :: ZonedUTC -> ZonedUTC -> NominalDiffTime
+diffZonedUtc (ZonedUTC utc1 _) (ZonedUTC utc2 _) = diffUTCTime utc1 utc2
+
 process :: Expr -> Expr -> [(String,Expr)] -> TEvent -> EvalM ()
+process selector key fields (SetMeta name value) = do
+  St.modify $ \st -> st {psCurrentMeta = M.insert name value (psCurrentMeta st)}
+
 process selector key fields ev = do
   st <- St.get
   St.modify $ \st -> st {psTimestamp = eTimestamp ev}
@@ -231,7 +250,7 @@ process selector key fields ev = do
   case psPrevEvent st of
     Nothing -> return ()
     Just prevEvent -> do
-      let dt = diffUTCTime (eTimestamp ev) (eTimestamp prevEvent)
+      let dt = diffZonedUtc (eTimestamp ev) (eTimestamp prevEvent)
       St.modify $ \st -> st {psDuration = dt}
       ok <- good prevEvent
       when ok $ do
@@ -239,8 +258,6 @@ process selector key fields ev = do
           fields' <- evalFields prevEvent
           putData key' dt fields'
           St.modify $ \st -> st {psTotalTime = psTotalTime st + dt}
-  when (eTask ev /= psCurrentTask st) $ do
-      St.put $ st {psCurrentTask = eTask ev, psStartTime = Just (eTimestamp ev)}
   St.modify $ \st -> st {psPrevEvent = Just ev}
 
 processAll :: Expr -> Expr -> [(String,Expr)] -> [TEvent] -> EvalM ()
