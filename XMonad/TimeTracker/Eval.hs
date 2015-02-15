@@ -23,6 +23,7 @@ data ParserState = PS {
     , psVariables :: [(String, Expr)]
     , psTimestamp :: ZonedUTC
     , psDuration :: NominalDiffTime
+    , psIdleTime :: Int
     , psResult :: M.Map Value TaskInfo
     } deriving (Eq, Show)
 
@@ -33,6 +34,7 @@ emptyPS = PS {
   psVariables = [],
   psDuration = 0,
   psTimestamp = undefined,
+  psIdleTime = 0,
   psTotalTime = 0,
   psResult = M.empty }
 
@@ -92,6 +94,10 @@ eval expr ev = go expr
     go Duration = do
       dt <- St.gets psDuration
       return $ Time $ nominalDiffTime2Time dt
+    go Idle = do
+      let idle = eIdleTime ev
+      -- return $ Time $ D.Time 0 0 $ idle -- `div` 1000
+      return $ Time $ seconds2Time $ idle `div` 1000
     go (Case pairs def) = do
       pairs' <- filterM (\(cond, expr) -> toBool <$> go cond) pairs
       case map snd pairs' of
@@ -249,7 +255,7 @@ process selector key fields (SetMeta name value) = do
 
 process selector key fields ev = do
   st <- St.get
-  St.modify $ \st -> st {psTimestamp = eTimestamp ev}
+  St.modify $ \st -> st {psTimestamp = eTimestamp ev, psIdleTime = eIdleTime ev}
   let good e = toBool <$> eval selector e
       getKey = eval key
       evalFields e = do

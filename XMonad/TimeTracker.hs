@@ -23,6 +23,7 @@ import Data.Binary as Binary
 import Data.Binary.Get (isEmpty)
 import GHC.Generics (Generic)
 import Text.Regex.Posix
+import Graphics.X11.XScreenSaver
 
 import XMonad
 import qualified XMonad.Util.ExtensibleState as XS
@@ -80,6 +81,7 @@ trackerHook = do
   currentZone <- io getCurrentTimeZone
   tracker <- XS.get
   let chan = trackerChan tracker
+  idle <- withDisplay $ \d -> io (getXIdleTime d)
   withWindowSet $ \ss -> do
     whenJust (W.peek ss) $ \window -> do
       time <- io $ getCurrentTime
@@ -90,7 +92,7 @@ trackerHook = do
                     eWindowTitle = winTitle,
                     eWindowClass = cls,
                     eAtoms = [],
-                    eIdleTime = 0,
+                    eIdleTime = idle,
                     eWorkspace = W.currentTag ss }
       io $ atomically $ writeTChan chan event
 

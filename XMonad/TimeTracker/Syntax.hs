@@ -13,6 +13,7 @@ data Expr =
   | StringProperty String
   | Timestamp
   | Duration
+  | Idle
   | Func Builtin Expr
   | BinOp BinOp Expr Expr
   | Not Expr
@@ -65,6 +66,7 @@ pPrint (List es) = "[" ++ intercalate ", " (map pPrint es) ++ "]"
 pPrint (StringProperty p) = "$" ++ p
 pPrint Timestamp = "$timestamp"
 pPrint Duration = "$duration"
+pPrint Idle = "$idle"
 pPrint (BinOp op e1 e2) = pPrint e1 ++ show op ++ pPrint e2
 pPrint (Func p e) = show p ++ " " ++ pPrint e
 pPrint (Not e) = "!" ++ pPrint e
@@ -106,7 +108,7 @@ toString (Bool b) = show b
 toString (LitList [x]) = toString x
 toString (LitList xs) = error $ "Unsupported nested list: " ++ show xs
 toString (DateTime t) = show t
-toString (Time t) = show t
+toString (Time t) = showTime t
 toString (WeekDay w) = show w
 
 toStrings :: Value -> [String]
@@ -115,8 +117,11 @@ toStrings (Int n) = [show n]
 toStrings (Bool b) = [show b]
 toStrings (LitList xs) = concatMap toStrings xs
 toStrings (DateTime t) = [show t]
-toStrings (Time t) = [show t]
+toStrings (Time t) = [showTime t]
 toStrings (WeekDay w) = [show w]
+
+showTime :: D.Time -> String
+showTime (D.Time h m s) = show h ++ "h" ++ show m ++ "m" ++ show s ++ "s"
 
 data Query =
   Query {

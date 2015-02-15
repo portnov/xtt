@@ -177,6 +177,11 @@ pDuration = do
   symbol "duration"
   return Duration
 
+pIdle = do
+  char '$'
+  symbol "idle"
+  return Idle
+
 term = parens pExpr
    <|> pList
    <|> pLiteral
@@ -184,6 +189,7 @@ term = parens pExpr
    <|> pIdentifier
    <|> (try pTimestamp <?> "$timestamp")
    <|> (try pDuration <?> "$duration")
+   <|> (try pIdle <?> "$idle")
    <|> pStringProperty
    <?> "simple expression"
 
