@@ -56,6 +56,7 @@ duration2int (D.Time h m s) = 3600*h + 60*m + s
 
 data Value =
     String String
+  | Int Int
   | Bool Bool
   | DateTime D.DateTime
   | Time D.Time
@@ -71,13 +72,15 @@ isElem expr regexs = BinOp Equals expr $ List $ map (Lit . String) regexs
 
 toBool :: Value -> Bool
 toBool (Bool b) = b
+toBool (Int n) = n /= 0
 toBool (String s) = s /= "" 
 toBool (LitList lst) = not (null lst)
 toBool (DateTime _) = True
-toBool (Time t) = (D.tHour t /= 0) && (D.tMinute t /= 0) && (D.tSecond t /= 0)
+toBool (Time t) = (D.tHour t /= 0) || (D.tMinute t /= 0) || (D.tSecond t /= 0)
 
 toString :: Value -> String
 toString (String s) = s
+toString (Int n) = show n
 toString (Bool b) = show b
 toString (LitList [x]) = toString x
 toString (LitList xs) = error $ "Unsupported nested list: " ++ show xs
@@ -87,6 +90,7 @@ toString (WeekDay w) = show w
 
 toStrings :: Value -> [String]
 toStrings (String s) = [s]
+toStrings (Int n) = [show n]
 toStrings (Bool b) = [show b]
 toStrings (LitList xs) = concatMap toStrings xs
 toStrings (DateTime t) = [show t]

@@ -55,9 +55,13 @@ pValue =
   try (DateTime <$> dateTimeLiteral <?> "date/time literal") <|>
   try (Time <$> timeLiteral <?> "time literal") <|>
   try (Time <$> durationLiteral <?> "duration literal") <|>
+  try (Int <$> integerLiteral <?> "integer literal") <|>
   try (WeekDay <$> weekdayLiteral <?> "weekday literal") <|>
   try (String <$> stringLiteral) <|>
   (Bool <$> (boolLiteral <?> "boolean literal"))
+
+integerLiteral :: Parser Int
+integerLiteral = fromIntegral <$> lexeme number
 
 weekdayLiteral :: Parser D.WeekDay
 weekdayLiteral =
