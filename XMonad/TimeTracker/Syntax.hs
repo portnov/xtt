@@ -145,10 +145,3 @@ getQuery name ds =
     [] -> Nothing
     qs -> Just $ last qs
 
-getStringProperty :: String -> TEvent -> String
--- getStringProperty "task" e = eTask e
-getStringProperty "title" e = eWindowTitle e
-getStringProperty "class" e = eWindowClass e
-getStringProperty "workspace" e = eWorkspace e
-getStringProperty p _ = error $ "Unknown property: " ++ p
-

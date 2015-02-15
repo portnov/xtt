@@ -9,6 +9,7 @@ import qualified Control.Monad.State as St
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Dates as D
+import Data.Maybe (fromMaybe)
 import Data.Time
 import Text.Regex.Posix
 
@@ -75,7 +76,7 @@ eval :: Expr -> TEvent -> EvalM Value
 eval expr ev = go expr
   where
     go (Lit val) = return val
-    go (StringProperty prop) = return $ String $ getStringProperty prop ev
+    go (StringProperty prop) = String <$> getStringProperty prop ev
     go (Func func e) = evalFunc func e
     go (BinOp op e1 e2) = evalOp op e1 e2
     go (List es) = LitList <$> mapM go es
@@ -232,6 +233,15 @@ putData key dt fields = do
 
 diffZonedUtc :: ZonedUTC -> ZonedUTC -> NominalDiffTime
 diffZonedUtc (ZonedUTC utc1 _) (ZonedUTC utc2 _) = diffUTCTime utc1 utc2
+
+getStringProperty :: String -> TEvent -> EvalM String
+-- getStringProperty "task" e = eTask e
+getStringProperty "title" e = return $ eWindowTitle e
+getStringProperty "class" e = return $ eWindowClass e
+getStringProperty "workspace" e = return $ eWorkspace e
+getStringProperty p e = do
+  meta <- St.gets psCurrentMeta
+  return $ fromMaybe "" $ M.lookup p meta `mplus` lookup p (eAtoms e)
 
 process :: Expr -> Expr -> [(String,Expr)] -> TEvent -> EvalM ()
 process selector key fields (SetMeta name value) = do
