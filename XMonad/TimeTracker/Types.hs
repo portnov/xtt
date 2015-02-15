@@ -33,6 +33,8 @@ data TEvent =
    deriving (Show, Generic, Typeable)
 
 instance Eq TEvent where
+  SetMeta k1 v1 == SetMeta k2 v2 = k1 == k2 && v1 == v2
+  Quit == Quit = True
   e1 == e2 =
     (eWindowTitle e1 == eWindowTitle e2) &&
     (eWindowClass e1 == eWindowClass e2) &&
