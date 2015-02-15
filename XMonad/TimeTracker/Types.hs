@@ -35,11 +35,13 @@ data TEvent =
 instance Eq TEvent where
   SetMeta k1 v1 == SetMeta k2 v2 = k1 == k2 && v1 == v2
   Quit == Quit = True
-  e1 == e2 =
+  e1@(BaseEvent {}) == e2@(BaseEvent {}) =
     (eWindowTitle e1 == eWindowTitle e2) &&
     (eWindowClass e1 == eWindowClass e2) &&
     (eWorkspace e1 == eWorkspace e2) &&
-    (eAtoms e1 == eAtoms e2)
+    (eAtoms e1 == eAtoms e2) &&
+    (eIdleTime e1 == eIdleTime e2)
+  e1 == e2 = False
 
 instance Binary Day where
   put (ModifiedJulianDay d) = Binary.put d
