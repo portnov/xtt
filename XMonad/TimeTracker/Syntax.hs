@@ -13,6 +13,7 @@ data Expr =
   | StringProperty String
   | Timestamp
   | Duration
+  | Func Builtin Expr
   | BinOp BinOp Expr Expr
   | Not Expr
   | Case [(Expr, Expr)] Expr
@@ -38,6 +39,25 @@ instance Show BinOp where
   show Lte = "<="
   show Gte = ">="
 
+data Builtin =
+    GetWeekDay
+  | GetDay
+  | GetMonth
+  | GetYear
+  | GetHour
+  | GetMinute
+  | GetSecond
+  deriving (Eq)
+
+instance Show Builtin where
+  show GetWeekDay = "weekday"
+  show GetDay = "day"
+  show GetMonth = "month"
+  show GetYear = "year"
+  show GetHour = "hour"
+  show GetMinute = "minute"
+  show GetSecond = "second"
+
 pPrint :: Expr -> String
 pPrint (Lit value) = toString value
 pPrint (Identifier id) = id
@@ -46,6 +66,7 @@ pPrint (StringProperty p) = "$" ++ p
 pPrint Timestamp = "$timestamp"
 pPrint Duration = "$duration"
 pPrint (BinOp op e1 e2) = pPrint e1 ++ show op ++ pPrint e2
+pPrint (Func p e) = show p ++ " " ++ pPrint e
 pPrint (Not e) = "!" ++ pPrint e
 pPrint (Case pairs def) = "case " ++ unlines (map go pairs) ++ " else " ++ pPrint def
   where

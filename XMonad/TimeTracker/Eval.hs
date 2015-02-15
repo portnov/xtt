@@ -65,6 +65,7 @@ eval expr ev = go expr
   where
     go (Lit val) = return val
     go (StringProperty prop) = return $ String $ getStringProperty prop ev
+    go (Func func e) = evalFunc func e
     go (BinOp op e1 e2) = evalOp op e1 e2
     go (List es) = LitList <$> mapM go es
     go (Not e) = (Bool . not . toBool) <$> go e
@@ -84,6 +85,31 @@ eval expr ev = go expr
       case map snd pairs' of
         [] -> go def
         (e:_) -> go e
+    
+    evalFunc GetWeekDay e = do
+        e' <- go e
+        case e' of
+          DateTime d -> return $ WeekDay $ D.dateWeekDay d
+          _ -> fail $ "Cannot get weekday of " ++ show e'
+    evalFunc GetDay e = evalDateInt D.day e
+    evalFunc GetMonth e = evalDateInt D.month e
+    evalFunc GetYear e = evalDateInt D.year e
+    evalFunc GetHour e = evalTimeInt D.hour D.tHour e
+    evalFunc GetMinute e = evalTimeInt D.minute D.tMinute e
+    evalFunc GetSecond e = evalTimeInt D.second D.tSecond e
+
+    evalDateInt f e = do
+        e' <- go e
+        case e' of
+          DateTime d -> return $ Int $ f d
+          _ -> fail $ "Cannot use date function on " ++ show e'
+
+    evalTimeInt fDate fTime e = do
+        e' <- go e
+        case e' of
+          DateTime d -> return $ Int $ fDate d
+          Time t -> return $ Int $ fTime t
+          _ -> fail $ "Cannot use time function on " ++ show e'
 
     evalOp Equals e (List es) =
         Bool <$> (elem <$> go e <*> mapM go es)

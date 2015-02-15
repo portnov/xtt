@@ -26,7 +26,8 @@ xttDef = P.LanguageDef {
            P.opStart = P.opLetter xttDef,
            P.opLetter = oneOf ":!#$%*+./<=>?@\\^|-~",
            P.reservedOpNames = ["==", "=~", "&&", "||", "!", "!=", "@"],
-           P.reservedNames = ["let", "query", "select", "where", "group", "by", "as", "case", "when", "then"],
+           P.reservedNames = ["let", "query", "select", "where", "group", "by", "as", "case", "when", "then",
+                              "weekday", "day", "month", "year", "hour", "minute", "second"],
            P.caseSensitive = True
         }
 
@@ -134,7 +135,22 @@ pIdentifier = Identifier <$> identifier
 pExpr :: Parser Expr
 pExpr =
   try pCase <|>
-    buildExpressionParser table term <?> "expression"
+  buildExpressionParser table term <?> "expression"
+
+pFunction :: Parser Expr
+pFunction = do
+        use "weekday" GetWeekDay
+    <|> use "day" GetDay
+    <|> use "month" GetMonth
+    <|> use "year" GetYear
+    <|> use "hour" GetHour
+    <|> use "minute" GetMinute
+    <|> use "second" GetSecond
+  where
+    use str func = try $ do
+      reserved str
+      expr <- term
+      return $ Func func expr
 
 pCase :: Parser Expr
 pCase = do
@@ -164,6 +180,7 @@ pDuration = do
 term = parens pExpr
    <|> pList
    <|> pLiteral
+   <|> pFunction
    <|> pIdentifier
    <|> (try pTimestamp <?> "$timestamp")
    <|> (try pDuration <?> "$duration")
