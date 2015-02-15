@@ -139,6 +139,9 @@ eval expr ev = go expr
       case (e1', e2') of
         (Time t1, Time t2) -> return $ Bool $ t1 `op` t2
         (DateTime dt1, DateTime dt2) -> return $ Bool $ dt1 `op` dt2
+        (Int n1, Int n2) -> return $ Bool $ n1 `op` n2
+        (Int n, Time t) -> return $ Bool $ n `op` duration2int t
+        (Time t, Int n) -> return $ Bool $ duration2int t `op` n
         (x,y) -> fail $ "Cannot compare " ++ show x ++ " with " ++ show y
 
 equalsDate d1 d2 =
