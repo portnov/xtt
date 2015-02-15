@@ -30,6 +30,10 @@ data TEvent =
      }
    | SetMeta String String
    | Quit
+   | IdleEvent {
+       eTimestamp :: ZonedUTC
+     , eIdleTime :: Int
+     }
    deriving (Show, Generic, Typeable)
 
 instance Eq TEvent where
@@ -41,6 +45,7 @@ instance Eq TEvent where
     (eWorkspace e1 == eWorkspace e2) &&
     (eAtoms e1 == eAtoms e2) &&
     (eIdleTime e1 == eIdleTime e2)
+  (IdleEvent _ it1) == (IdleEvent _ it2) = it1 == it2 
   e1 == e2 = False
 
 instance Binary Day where

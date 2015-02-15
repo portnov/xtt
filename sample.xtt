@@ -11,9 +11,10 @@ let workClasses =
   [] ;
 
 let isWork =
-    $title =~ workTitles ||
-    $workspace =~ workWorkspaces ||
-    $class == workClasses
+    $idle < 30s &&
+    ($title =~ workTitles ||
+     $workspace =~ workWorkspaces ||
+     $class == workClasses)
 ;
 
 let smth = case

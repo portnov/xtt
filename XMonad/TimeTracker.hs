@@ -60,8 +60,22 @@ trackerInit path = do
   chan <- io $ atomically $ newTChan
   file <- io $ openFile path AppendMode
   io $ forkIO $ writer chan file
+--   withDisplay $ \dpy ->
+--       io $ forkIO $ idleTracker dpy chan
   let tracker = Tracker chan "Startup"
   XS.put tracker
+
+idleTracker :: Display -> TChan TEvent -> IO ()
+idleTracker dpy chan = go
+  where
+    go = do
+      idle <- getXIdleTime dpy
+      when (idle >= 1000) $ do
+          currentZone <- getCurrentTimeZone
+          time <- getCurrentTime
+          atomically $ writeTChan chan $ IdleEvent (ZonedUTC time currentZone) idle
+      threadDelay (60 * 1000 * 1000)
+      go
 
 writer :: TChan TEvent -> Handle -> IO ()
 writer chan file = go Nothing

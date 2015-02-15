@@ -95,7 +95,8 @@ eval expr ev = go expr
       dt <- St.gets psDuration
       return $ Time $ nominalDiffTime2Time dt
     go Idle = do
-      let idle = eIdleTime ev
+      idle <- St.gets psIdleTime
+      -- let idle = eIdleTime ev
       -- return $ Time $ D.Time 0 0 $ idle -- `div` 1000
       return $ Time $ seconds2Time $ idle `div` 1000
     go (Case pairs def) = do
@@ -253,9 +254,12 @@ process :: Expr -> Expr -> [(String,Expr)] -> TEvent -> EvalM ()
 process selector key fields (SetMeta name value) = do
   St.modify $ \st -> st {psCurrentMeta = M.insert name value (psCurrentMeta st)}
 
+process selector key fields ev@(IdleEvent ts idle) = do
+  St.modify $ \st -> st {psPrevEvent = Just ev, psIdleTime = idle}
+
 process selector key fields ev = do
   st <- St.get
-  St.modify $ \st -> st {psTimestamp = eTimestamp ev, psIdleTime = eIdleTime ev}
+  St.modify $ \st -> st {psTimestamp = eTimestamp ev}
   let good e = toBool <$> eval selector e
       getKey = eval key
       evalFields e = do
@@ -265,9 +269,11 @@ process selector key fields ev = do
           return $ M.fromList fs
   case psPrevEvent st of
     Nothing -> return ()
+    Just (IdleEvent _ idle) -> do
+      St.modify $ \st -> st {psIdleTime = idle}
     Just prevEvent -> do
       let dt = diffZonedUtc (eTimestamp ev) (eTimestamp prevEvent)
-      St.modify $ \st -> st {psDuration = dt}
+      St.modify $ \st -> st {psDuration = dt, psIdleTime = eIdleTime ev}
       ok <- good prevEvent
       when ok $ do
           key' <- eval key prevEvent
