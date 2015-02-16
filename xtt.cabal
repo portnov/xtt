@@ -23,7 +23,7 @@ library
                        XMonad.TimeTracker.Parser
   -- other-modules:       
   build-depends:       base >= 4 && < 5,
-                       stm ==2.4.*,
+                       stm >=2.4,
                        bytestring >=0.10,
                        containers >=0.5,
                        unordered-containers >=0.2,
@@ -46,7 +46,7 @@ executable xtt-dump
   main-is:             xtt-dump.hs
   -- other-modules:       
   build-depends:       base >= 4 && < 5,
-                       stm ==2.4.*,
+                       stm >=2.4,
                        bytestring >=0.10,
                        containers >=0.5,
                        unordered-containers >=0.2,
@@ -67,7 +67,7 @@ executable xtt-stats
   main-is:             xtt-stats.hs
   -- other-modules:       
   build-depends:       base >= 4 && < 5,
-                       stm ==2.4.*,
+                       stm >=2.4,
                        bytestring >=0.10,
                        containers >=0.5,
                        unordered-containers >=0.2,

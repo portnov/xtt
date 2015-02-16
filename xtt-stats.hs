@@ -5,6 +5,7 @@ import qualified Control.Monad.State as St
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.ByteString.Lazy as BL
+import Data.List (intercalate)
 import Data.Time
 import Data.Binary
 import Data.Binary.Get
@@ -38,8 +39,8 @@ formatDt dt =
 
 formatTaskInfo :: TaskInfo -> String
 formatTaskInfo ti =
-    formatDt (tiDuration ti) ++ "\n" ++
-    unlines (concatMap showValues $ M.assocs $ tiFields ti)
+    intercalate "\n" $
+    formatDt (tiDuration ti) : (concatMap showValues $ M.assocs $ tiFields ti)
   where
     showValues (key, vmap) =
         ["\t" ++ key ++ ":\t" ++ toString value ++ "\t" ++ formatDt dt  | (value, dt) <- M.assocs vmap]
